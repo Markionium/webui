@@ -274,6 +274,67 @@ For `--out ./dist/catalog.bin`, the paired schema is written to
 `./dist/catalog.state.schema.json`. The standalone `webui schema` command
 remains useful for existing protocol artifacts.
 
+### `webui generate`
+
+Generate host-language types from a WebUI render-state schema. Generated source
+is written to stdout.
+
+```bash
+webui generate <LANGUAGE> <FILE> [--name <NAME>]
+```
+
+Supported languages:
+
+| Command | Additional options | Output |
+|---------|--------------------|--------|
+| `webui generate typescript` | *(none)* | Interfaces, route union, and route path map |
+| `webui generate rust` | *(none)* | Serde structs and an untagged route enum |
+| `webui generate csharp` | `--namespace <NAMESPACE>`, `--visibility <public\|internal>` | Classes and a System.Text.Json source-generation context |
+
+Examples:
+
+```bash
+webui generate typescript ./dist/app.state.schema.json \
+  --name AppState > ./src/generated/app-state.ts
+
+webui generate rust ./dist/app.state.schema.json \
+  --name AppState > ./src/generated/app_state.rs
+
+webui generate csharp ./dist/app.state.schema.json \
+  --name AppState \
+  --namespace Contoso.Web.Generated \
+  --visibility internal > ./Generated/AppState.g.cs
+```
+
+The generated Rust source requires `serde` with its `derive` feature and
+`serde_json`.
+
+Type mappings:
+
+| Schema | TypeScript | Rust | C# |
+|--------|------------|------|----|
+| `string` | `string` | `String` | `string` |
+| `number` | `number` | `f64` | `double` |
+| `integer` | `number` | `i64` | `long` |
+| `boolean` | `boolean` | `bool` | `bool` |
+| Unconstrained | `unknown` | `serde_json::Value` | `JsonElement` |
+| Union without a preferred type | Native union | `serde_json::Value` | `JsonElement` |
+
+WebUI schemas may add a non-validating hint:
+
+```json
+{
+  "type": ["string", "number", "boolean"],
+  "x-webui": {
+    "preferredType": "string"
+  }
+}
+```
+
+All generators use the preferred concrete type for DTO authoring. The standard
+JSON Schema `type` or `anyOf` remains broader so validators still describe every
+value the renderer accepts. Standard JSON Schema validators ignore `x-webui`.
+
 ### `webui serve`
 
 Start a development server that builds, renders, and serves a WebUI application. Enable live reload with `--watch`.

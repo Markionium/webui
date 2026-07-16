@@ -1811,6 +1811,10 @@ uses the following rules:
 - Plain text and normal attribute values accept JSON scalars: `string`,
   `number`, or `boolean`. Complex `:property` bindings remain unconstrained
   until child-template usage provides stronger structural evidence.
+- Broad scalar and truthiness schemas can carry non-validating generation
+  metadata under `x-webui.preferredType`. Plain rendered values prefer
+  `string`; condition identifiers prefer `boolean`. Validators continue to use
+  the standard `type`/`anyOf` contract.
 - Raw signals are strings.
 - Dotted paths create nested objects.
 - A terminal `.length` accepts the runtime's three valid forms: a string, an
@@ -1855,6 +1859,33 @@ unexpectedly couple them. Definition keys are readable route encodings, but
 consumers should still use `x-webui-routes` rather than constructing `$defs`
 keys. Host-language DTO generation and runtime schema validation are separate
 concerns and are not part of `schema`.
+
+### Host-Language Type Generation
+
+`webui generate <language> <schema>` reads a schema produced by `webui schema`
+or `webui build --emit-schema` and writes generated source to stdout:
+
+```bash
+webui generate typescript state.schema.json --name AppState
+webui generate rust state.schema.json --name AppState
+webui generate csharp state.schema.json --name AppState \
+  --namespace WebUI.Generated --visibility internal
+```
+
+All generators consume one normalized, language-neutral schema model. Language
+backends implement a small internal generator trait, so adding a backend does
+not alter schema parsing or existing generators.
+
+TypeScript emits interfaces plus a route-state union, path map, and path-indexed
+helper for routed schemas. Rust generates serde structs and a serialize-only
+untagged route enum. C# generates classes and a
+`System.Text.Json` source-generation context.
+
+When a schema type is broader than a language can represent natively,
+`x-webui.preferredType` supplies the conventional concrete DTO type in every
+language. Without a preferred type, TypeScript uses `unknown`, Rust uses
+`serde_json::Value`, and C# uses `JsonElement`. This metadata guides code
+generation only and never narrows JSON Schema validation.
 
 ## Example Workflow
 

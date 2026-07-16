@@ -234,6 +234,23 @@ Routed applications produce one named schema per complete route chain. The
 allowing build-time tools to generate route-specific types without adding
 runtime validation overhead.
 
+## Generating Host-Language Types
+
+Use the generated schema to produce state types:
+
+```bash
+webui generate typescript ./dist/app.state.schema.json --name AppState
+webui generate rust ./dist/app.state.schema.json --name AppState
+webui generate csharp ./dist/app.state.schema.json \
+  --name AppState \
+  --namespace WebUI.Generated
+```
+
+WebUI keeps validation and code-generation intent separate. A broad schema may
+include `x-webui.preferredType` so generated DTOs use the practical authoring
+type in every language. Unconstrained values remain `unknown` in TypeScript,
+`serde_json::Value` in Rust, and `JsonElement` in C#.
+
 ## Learn More
 
 - [Signals](/guide/concepts/directives/signals) - Template binding syntax

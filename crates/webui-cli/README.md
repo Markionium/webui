@@ -98,6 +98,23 @@ Plain bindings accept string, number, or boolean values. Loops and dotted paths
 produce array and object schemas. Routed entries produce separate definitions
 for each route chain plus an `x-webui-routes` path-to-schema mapping.
 
+### `webui generate`
+
+Generate host-language types from a render-state schema:
+
+```bash
+webui generate typescript ./dist/protocol.state.schema.json --name AppState
+webui generate rust ./dist/protocol.state.schema.json --name AppState
+webui generate csharp ./dist/protocol.state.schema.json \
+  --name AppState \
+  --namespace WebUI.Generated \
+  --visibility internal
+```
+
+Generated source is written to stdout. TypeScript emits interfaces and routed
+path mappings, Rust emits serde types, and C# emits classes plus a
+`System.Text.Json` source-generation context.
+
 ## App Layout
 
 ```

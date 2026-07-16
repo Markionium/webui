@@ -690,6 +690,20 @@ schemas are build-time contracts; WebUI does not validate them during rendering.
 Use `webui build --emit-schema` to create the protocol and its paired schema in
 one build.
 
+### Generate host-language state types
+
+```bash
+webui generate typescript ./dist/protocol.state.schema.json --name AppState
+webui generate rust ./dist/protocol.state.schema.json --name AppState
+webui generate csharp ./dist/protocol.state.schema.json \
+  --name AppState \
+  --namespace WebUI.Generated
+```
+
+All generators consume `x-webui.preferredType` when present. Otherwise open
+values become `unknown`, `serde_json::Value`, and `JsonElement` in TypeScript,
+Rust, and C#, respectively. Routed schemas generate one type per route chain.
+
 ## Build Diagnostics & Error Output
 
 Authoring mistakes fail `webui build` with a structured, actionable diagnostic

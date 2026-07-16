@@ -14,9 +14,16 @@ pub(super) enum InferredKind {
     Object,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(super) enum PreferredKind {
+    String,
+    Boolean,
+}
+
 #[derive(Default)]
 pub(super) struct Node {
     kind: Option<InferredKind>,
+    preferred: Option<PreferredKind>,
     required: bool,
     length_kind: Option<InferredKind>,
     length_required: bool,
@@ -39,7 +46,13 @@ impl Node {
     }
 }
 
-pub(super) fn add_resolved_path(root: &mut Node, path: &str, kind: InferredKind, required: bool) {
+pub(super) fn add_resolved_path(
+    root: &mut Node,
+    path: &str,
+    kind: InferredKind,
+    preferred: Option<PreferredKind>,
+    required: bool,
+) {
     let mut parts = path.split('.').filter(|part| !part.is_empty()).peekable();
     let mut current = root;
     let mut saw_part = false;
@@ -54,6 +67,7 @@ pub(super) fn add_resolved_path(root: &mut Node, path: &str, kind: InferredKind,
     }
     if saw_part {
         current.kind = Some(merge_kind(current.kind, kind));
+        current.preferred = merge_preferred(current.preferred, preferred);
     }
 }
 
@@ -88,7 +102,10 @@ pub(super) fn node_to_schema(root: &Node) -> Value {
                 } else if let Some(kind) = node.length_kind {
                     values.push(length_parent_schema(kind, node.length_required, node.kind));
                 } else {
-                    values.push(leaf_schema(node.kind.unwrap_or(InferredKind::Any)));
+                    values.push(leaf_schema(
+                        node.kind.unwrap_or(InferredKind::Any),
+                        node.preferred,
+                    ));
                 }
             }
             SchemaTask::FinishArray => {
@@ -117,7 +134,7 @@ pub(super) fn node_to_schema(root: &Node) -> Value {
                 }
                 if let Some(kind) = node.length_kind {
                     if !properties.contains_key("length") {
-                        properties.insert("length".to_string(), leaf_schema(kind));
+                        properties.insert("length".to_string(), leaf_schema(kind, None));
                         if node.length_required {
                             required.push(Value::String("length".to_string()));
                         }
@@ -179,14 +196,30 @@ fn merge_kind(existing: Option<InferredKind>, incoming: InferredKind) -> Inferre
     }
 }
 
-fn leaf_schema(kind: InferredKind) -> Value {
-    match kind {
+fn merge_preferred(
+    existing: Option<PreferredKind>,
+    incoming: Option<PreferredKind>,
+) -> Option<PreferredKind> {
+    match (existing, incoming) {
+        (Some(existing), Some(incoming)) if existing == incoming => Some(existing),
+        (None, preferred) | (preferred, None) => preferred,
+        (Some(_), Some(_)) => None,
+    }
+}
+
+fn leaf_schema(kind: InferredKind, preferred: Option<PreferredKind>) -> Value {
+    let schema = match kind {
         InferredKind::Scalar => scalar_schema(),
         InferredKind::Any => any_schema(),
         InferredKind::String => type_schema("string"),
         InferredKind::Boolean => type_schema("boolean"),
         InferredKind::Number => type_schema("number"),
         InferredKind::Object => object_schema(Map::new()),
+    };
+    if matches!(kind, InferredKind::Scalar | InferredKind::Any) {
+        with_preferred_type(schema, preferred)
+    } else {
+        schema
     }
 }
 
@@ -211,7 +244,7 @@ fn length_parent_schema(
     array_schema.insert("type".to_string(), Value::String("array".to_string()));
 
     let mut object_properties = Map::new();
-    object_properties.insert("length".to_string(), leaf_schema(kind));
+    object_properties.insert("length".to_string(), leaf_schema(kind, None));
     let mut object_schema = Map::new();
     object_schema.insert("properties".to_string(), Value::Object(object_properties));
     object_schema.insert(
@@ -261,4 +294,23 @@ fn object_schema(properties: Map<String, Value>) -> Value {
     schema.insert("required".to_string(), Value::Array(Vec::new()));
     schema.insert("type".to_string(), Value::String("object".to_string()));
     Value::Object(schema)
+}
+
+fn with_preferred_type(mut schema: Value, preferred: Option<PreferredKind>) -> Value {
+    let Some(preferred) = preferred else {
+        return schema;
+    };
+    let preferred = match preferred {
+        PreferredKind::String => "string",
+        PreferredKind::Boolean => "boolean",
+    };
+    if let Some(object) = schema.as_object_mut() {
+        let mut webui = Map::new();
+        webui.insert(
+            "preferredType".to_string(),
+            Value::String(preferred.to_string()),
+        );
+        object.insert("x-webui".to_string(), Value::Object(webui));
+    }
+    schema
 }
