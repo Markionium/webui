@@ -50,6 +50,10 @@ struct CommonGenerateArgs {
     /// Override the root generated type name
     #[arg(long)]
     name: Option<String>,
+
+    /// Write generated source to a file instead of stdout
+    #[arg(long)]
+    out: Option<PathBuf>,
 }
 
 #[derive(Args)]
@@ -89,22 +93,36 @@ pub fn execute(args: &GenerateArgs) -> Result<()> {
 }
 
 fn run(args: &GenerateArgs) -> Result<()> {
-    let generated = match &args.language {
+    let (generated, common) = match &args.language {
         GenerateLanguage::TypeScript(common) => {
             let document = load_document(common)?;
-            typescript::TypeScriptGenerator.generate(&document)?
+            (typescript::TypeScriptGenerator.generate(&document)?, common)
         }
         GenerateLanguage::Rust(common) => {
             let document = load_document(common)?;
-            rust::RustGenerator.generate(&document)?
+            (rust::RustGenerator.generate(&document)?, common)
         }
         GenerateLanguage::CSharp(args) => {
             let document = load_document(&args.common)?;
-            csharp::CSharpGenerator::new(&args.namespace, args.visibility.keyword())
-                .generate(&document)?
+            (
+                csharp::CSharpGenerator::new(&args.namespace, args.visibility.keyword())
+                    .generate(&document)?,
+                &args.common,
+            )
         }
     };
-    print!("{generated}");
+    if let Some(out) = &common.out {
+        let out = expand_tilde(out)
+            .with_context(|| format!("Failed to expand output path: {}", out.display()))?
+            .into_owned();
+        if let Some(parent) = out.parent().filter(|parent| !parent.as_os_str().is_empty()) {
+            fs::create_dir_all(parent)
+                .with_context(|| format!("Failed to create {}", parent.display()))?;
+        }
+        fs::write(&out, generated).with_context(|| format!("Failed to write {}", out.display()))?;
+    } else {
+        print!("{generated}");
+    }
     Ok(())
 }
 

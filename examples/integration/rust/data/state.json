@@ -1,0 +1,10 @@
+{
+  "title": "Typed Rust state",
+  "showDetails": true,
+  "details": "This state was deserialized through generated Rust types.",
+  "items": [
+    { "label": "Build protocol" },
+    { "label": "Generate types" },
+    { "label": "Render HTML" }
+  ]
+}

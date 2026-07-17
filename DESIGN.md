@@ -1863,11 +1863,12 @@ concerns and are not part of `schema`.
 ### Host-Language Type Generation
 
 `webui generate <language> <schema>` reads a schema produced by `webui schema`
-or `webui build --emit-schema` and writes generated source to stdout:
+or `webui build --emit-schema` and writes generated source to stdout or the
+path supplied by `--out`:
 
 ```bash
 webui generate typescript state.schema.json --name AppState
-webui generate rust state.schema.json --name AppState
+webui generate rust state.schema.json --name AppState --out src/app_state.rs
 webui generate csharp state.schema.json --name AppState \
   --namespace WebUI.Generated --visibility internal
 ```

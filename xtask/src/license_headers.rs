@@ -22,7 +22,11 @@ const CHECKED_EXTENSIONS: &[&str] = &["rs", "ts", "js", "cs", "h", "proto"];
 
 /// Individual tracked files to skip (relative to workspace root).
 /// Generated files that are checked in but not hand-authored belong here.
-const SKIP_FILES: &[&str] = &["crates/webui-ffi/include/webui_ffi.h"];
+const SKIP_FILES: &[&str] = &[
+    "crates/webui-ffi/include/webui_ffi.h",
+    "examples/app/routes/server/src/generated/routes-state.ts",
+    "examples/integration/rust/src/generated_state.rs",
+];
 
 // ── Public API ──────────────────────────────────────────────────────────
 

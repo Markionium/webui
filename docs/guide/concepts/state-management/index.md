@@ -239,8 +239,12 @@ runtime validation overhead.
 Use the generated schema to produce state types:
 
 ```bash
-webui generate typescript ./dist/app.state.schema.json --name AppState
-webui generate rust ./dist/app.state.schema.json --name AppState
+webui generate typescript ./dist/app.state.schema.json \
+  --name AppState \
+  --out ./src/generated/app-state.ts
+webui generate rust ./dist/app.state.schema.json \
+  --name AppState \
+  --out ./src/generated/app_state.rs
 webui generate csharp ./dist/app.state.schema.json \
   --name AppState \
   --namespace WebUI.Generated

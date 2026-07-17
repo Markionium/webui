@@ -9,6 +9,7 @@ name = "webui-rust-example"
 path = "src/main.rs"
 
 [dependencies]
+serde = { workspace = true }
 serde_json = { workspace = true }
 microsoft-webui-protocol = { path = "../../../crates/webui-protocol" }
 microsoft-webui-handler = { path = "../../../crates/webui-handler" }

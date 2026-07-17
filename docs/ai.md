@@ -693,8 +693,12 @@ one build.
 ### Generate host-language state types
 
 ```bash
-webui generate typescript ./dist/protocol.state.schema.json --name AppState
-webui generate rust ./dist/protocol.state.schema.json --name AppState
+webui generate typescript ./dist/protocol.state.schema.json \
+  --name AppState \
+  --out ./src/generated/app-state.ts
+webui generate rust ./dist/protocol.state.schema.json \
+  --name AppState \
+  --out ./src/generated/app_state.rs
 webui generate csharp ./dist/protocol.state.schema.json \
   --name AppState \
   --namespace WebUI.Generated

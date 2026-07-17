@@ -82,6 +82,35 @@ fn snapshots_typescript_route_types() {
 }
 
 #[test]
+fn routed_example_generated_types_are_current() {
+    let document = routes_document();
+    let output = TypeScriptGenerator.generate(&document).unwrap();
+    let checked_in = std::fs::read_to_string(
+        workspace_root().join("examples/app/routes/server/src/generated/routes-state.ts"),
+    )
+    .unwrap();
+    assert_eq!(checked_in, output);
+}
+
+#[test]
+fn rust_example_generated_types_are_current() {
+    let workspace = workspace_root();
+    let result = webui::build(BuildOptions {
+        app_dir: workspace.join("examples/integration/rust/app"),
+        ..BuildOptions::default()
+    })
+    .unwrap();
+    let schema =
+        state_schema::generate_schema(&result.protocol, "index.html", "RustExampleState").unwrap();
+    let document = TypeDocument::from_schema(&schema, None).unwrap();
+    let output = RustGenerator.generate(&document).unwrap();
+    let checked_in =
+        std::fs::read_to_string(workspace.join("examples/integration/rust/src/generated_state.rs"))
+            .unwrap();
+    assert_eq!(checked_in, output);
+}
+
+#[test]
 fn snapshots_rust_component_types() {
     let document = fixture_document("component-scope", "ComponentScopeState");
     let output = RustGenerator.generate(&document).unwrap();

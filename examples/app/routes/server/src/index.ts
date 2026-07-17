@@ -9,9 +9,13 @@
  */
 
 import express from 'express';
+import type { RoutesStateByPath } from './generated/routes-state.js';
+
+type ApiState<Path extends keyof RoutesStateByPath> =
+  Omit<RoutesStateByPath[Path], 'basePath'>;
 
 const app = express();
-const PORT = Number(process.env.PORT) || 3018;
+const PORT = Number(process.env['PORT']) || 3018;
 
 // ── Data ─────────────────────────────────────────────────────────
 
@@ -110,7 +114,7 @@ function findLesson(topic: Topic, lessonId: string): Lesson | undefined {
 
 // ── Shell state (always included) ────────────────────────────────
 
-function shellState() {
+function shellState(): ApiState<'/'> {
   return {
     title: 'Learning Platform',
     textdirection: 'ltr',
@@ -130,15 +134,14 @@ app.get('/sections/:id', (req, res) => {
   const section = findSection(req.params.id);
   if (!section) return res.status(404).json({ state: shellState() });
 
-  res.json({
-    state: {
-      ...shellState(),
-      sectionId: section.id,
-      sectionName: section.name,
-      sectionIcon: section.icon,
-      topics: section.topics.map(({ id, name }) => ({ id, name })),
-    },
-  });
+  const state: ApiState<'/sections/:sectionId'> = {
+    ...shellState(),
+    sectionId: section.id,
+    sectionName: section.name,
+    sectionIcon: section.icon,
+    topics: section.topics.map(({ id, name }) => ({ id, name })),
+  };
+  res.json({ state });
 });
 
 app.get('/sections/:id/topics/:topicId', (req, res) => {
@@ -147,18 +150,17 @@ app.get('/sections/:id/topics/:topicId', (req, res) => {
   const topic = findTopic(section, req.params.topicId);
   if (!topic) return res.status(404).json({ state: shellState() });
 
-  res.json({
-    state: {
-      ...shellState(),
-      sectionId: section.id,
-      sectionName: section.name,
-      sectionIcon: section.icon,
-      topicId: topic.id,
-      topicName: topic.name,
-      topics: section.topics.map(({ id, name }) => ({ id, name })),
-      lessons: topic.lessons.map(({ id, name }) => ({ id, name })),
-    },
-  });
+  const state: ApiState<'/sections/:sectionId/topics/:topicId'> = {
+    ...shellState(),
+    sectionId: section.id,
+    sectionName: section.name,
+    sectionIcon: section.icon,
+    topicId: topic.id,
+    topicName: topic.name,
+    topics: section.topics.map(({ id, name }) => ({ id, name })),
+    lessons: topic.lessons.map(({ id, name }) => ({ id, name })),
+  };
+  res.json({ state });
 });
 
 app.get('/sections/:id/topics/:topicId/lessons/:lessonId', (req, res) => {
@@ -169,21 +171,20 @@ app.get('/sections/:id/topics/:topicId/lessons/:lessonId', (req, res) => {
   const lesson = findLesson(topic, req.params.lessonId);
   if (!lesson) return res.status(404).json({ state: shellState() });
 
-  res.json({
-    state: {
-      ...shellState(),
-      sectionId: section.id,
-      sectionName: section.name,
-      sectionIcon: section.icon,
-      topicId: topic.id,
-      topicName: topic.name,
-      topics: section.topics.map(({ id, name }) => ({ id, name })),
-      lessons: topic.lessons.map(({ id, name }) => ({ id, name })),
-      lessonId: lesson.id,
-      lessonName: lesson.name,
-      lessonContent: lesson.content,
-    },
-  });
+  const state: ApiState<'/sections/:sectionId/topics/:topicId/lessons/:lessonId'> = {
+    ...shellState(),
+    sectionId: section.id,
+    sectionName: section.name,
+    sectionIcon: section.icon,
+    topicId: topic.id,
+    topicName: topic.name,
+    topics: section.topics.map(({ id, name }) => ({ id, name })),
+    lessons: topic.lessons.map(({ id, name }) => ({ id, name })),
+    lessonId: lesson.id,
+    lessonName: lesson.name,
+    lessonContent: lesson.content,
+  };
+  res.json({ state });
 });
 
 app.listen(PORT, () => {

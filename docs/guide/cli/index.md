@@ -277,11 +277,18 @@ remains useful for existing protocol artifacts.
 ### `webui generate`
 
 Generate host-language types from a WebUI render-state schema. Generated source
-is written to stdout.
+is written to stdout unless `--out <FILE>` is provided.
 
 ```bash
-webui generate <LANGUAGE> <FILE> [--name <NAME>]
+webui generate <LANGUAGE> <FILE> [--name <NAME>] [--out <FILE>]
 ```
+
+Common options:
+
+| Option | Description |
+|--------|-------------|
+| `--name <NAME>` | Override the root generated type name |
+| `--out <FILE>` | Write generated source to a file, creating parent directories when needed |
 
 Supported languages:
 
@@ -295,15 +302,18 @@ Examples:
 
 ```bash
 webui generate typescript ./dist/app.state.schema.json \
-  --name AppState > ./src/generated/app-state.ts
+  --name AppState \
+  --out ./src/generated/app-state.ts
 
 webui generate rust ./dist/app.state.schema.json \
-  --name AppState > ./src/generated/app_state.rs
+  --name AppState \
+  --out ./src/generated/app_state.rs
 
 webui generate csharp ./dist/app.state.schema.json \
   --name AppState \
   --namespace Contoso.Web.Generated \
-  --visibility internal > ./Generated/AppState.g.cs
+  --visibility internal \
+  --out ./Generated/AppState.g.cs
 ```
 
 The generated Rust source requires `serde` with its `derive` feature and

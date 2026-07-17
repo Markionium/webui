@@ -40,9 +40,11 @@ impl LanguageGenerator for RustGenerator {
             writer.blank_line();
         }
 
-        for definition in &document.definitions {
+        for (index, definition) in document.definitions.iter().enumerate() {
             render_struct(&mut writer, definition, &never_name)?;
-            writer.blank_line();
+            if index + 1 < document.definitions.len() || !document.routes.is_empty() {
+                writer.blank_line();
+            }
         }
 
         if !document.routes.is_empty() {
@@ -81,12 +83,20 @@ fn render_struct(
     let mut names = BTreeSet::new();
     for property in &definition.properties {
         let field_name = allocate_field_name(&property.json_name, &mut names);
-        writer.push("#[serde(rename = ");
-        writer.push(&serde_json::to_string(&property.json_name)?);
         if property.required {
+            writer.push("#[serde(rename = ");
+            writer.push(&serde_json::to_string(&property.json_name)?);
             writer.line(")]");
         } else {
-            writer.line(", default, skip_serializing_if = \"Option::is_none\")]");
+            writer.line("#[serde(");
+            writer.indent();
+            writer.push("rename = ");
+            writer.push(&serde_json::to_string(&property.json_name)?);
+            writer.line(",");
+            writer.line("default,");
+            writer.line("skip_serializing_if = \"Option::is_none\"");
+            writer.dedent();
+            writer.line(")]");
         }
         writer.push("pub ");
         writer.push(&field_name);

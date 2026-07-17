@@ -6,7 +6,11 @@ expression: output
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ComponentScopeState {
-    #[serde(rename = "alignment", default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "alignment",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
     pub alignment: Option<String>,
     #[serde(rename = "globalLabel")]
     pub global_label: String,
@@ -24,7 +28,11 @@ pub struct ComponentScopeState {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ComponentScopeStateUser {
-    #[serde(rename = "active", default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "active",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
     pub active: Option<bool>,
     #[serde(rename = "name")]
     pub name: String,

@@ -3512,6 +3512,7 @@ dependencies = [
  "anyhow",
  "microsoft-webui-handler",
  "microsoft-webui-protocol",
+ "serde",
  "serde_json",
 ]
 
