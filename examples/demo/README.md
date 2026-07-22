@@ -51,6 +51,15 @@ examples/demo/
 └── README.md
 ```
 
+## Generated Rust state
+
+The Rust demo shell server uses state types generated from the shell template.
+Regenerate them after changing shell bindings:
+
+```bash
+pnpm --dir examples/demo run generate:types
+```
+
 ## `demo.toml` Schema
 
 Each example app has a `demo.toml` file that describes how to run it:

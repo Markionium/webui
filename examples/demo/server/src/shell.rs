@@ -10,6 +10,7 @@
 //! served from `<shell_dir>/dist/`.
 
 use actix_web::{web, HttpRequest, HttpResponse};
+use anyhow::Context;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -18,6 +19,9 @@ use webui_handler::plugin::webui::WebUIHydrationPlugin;
 use webui_handler::{RenderOptions, ResponseWriter, WebUIHandler};
 use webui_protocol::WebUIProtocol;
 
+use crate::generated_state::{
+    DemoShellRenderState, DemoShellRenderStateAppsItem, DemoShellRenderStateCurrentApp,
+};
 use crate::registry::AppEntry;
 
 /// Shared state for the shell renderer: the compiled protocol and the
@@ -64,37 +68,35 @@ impl ShellState {
 }
 
 /// Build the per-request render state from the discovered app registry.
-fn build_state(apps: &[AppEntry], current_index: usize) -> serde_json::Value {
-    let total = apps.len();
-    let app_array: Vec<serde_json::Value> = apps
+fn build_state(apps: &[AppEntry], current_index: usize) -> anyhow::Result<DemoShellRenderState> {
+    let total_apps = i64::try_from(apps.len()).context("Too many demo apps to render")?;
+    let current_display =
+        i64::try_from(current_index + 1).context("Current demo app index is too large")?;
+    let app_array: Vec<DemoShellRenderStateAppsItem> = apps
         .iter()
-        .map(|a| {
-            serde_json::json!({
-                "slug": a.slug,
-                "name": a.name,
-                "description": a.description,
-                "backend": a.backend,
-                "sourceUrl": a.source_url(),
-                "iframeUrl": format!("/{}/", a.slug),
-            })
+        .map(|a| DemoShellRenderStateAppsItem {
+            slug: a.slug.clone(),
+            name: a.name.clone(),
+            description: a.description.clone(),
+            backend: a.backend.clone(),
         })
         .collect();
 
-    let current = apps.get(current_index).expect("current_index in range");
+    let current = apps
+        .get(current_index)
+        .context("Current demo app index is out of range")?;
 
-    serde_json::json!({
-        "basePath": "/_shell/",
-        "apps": app_array,
-        "currentApp": {
-            "slug": current.slug,
-            "name": current.name,
-            "description": current.description,
-            "backend": current.backend,
-            "sourceUrl": current.source_url(),
-            "iframeUrl": format!("/{}/", current.slug),
+    Ok(DemoShellRenderState {
+        base_path: "/_shell/".to_string(),
+        apps: app_array,
+        current_app: DemoShellRenderStateCurrentApp {
+            iframe_url: format!("/{}/", current.slug),
+            name: current.name.clone(),
+            slug: Some(current.slug.clone()),
+            source_url: current.source_url(),
         },
-        "totalApps": total,
-        "currentDisplay": current_index + 1,
+        total_apps,
+        current_display,
     })
 }
 
@@ -135,7 +137,15 @@ pub(crate) async fn shell_page(
         .and_then(|slug| apps.iter().position(|a| a.slug == slug))
         .unwrap_or(0);
 
-    let state = build_state(&apps, current_index);
+    let state = match build_state(&apps, current_index).and_then(|state| {
+        serde_json::to_value(state).context("Failed to serialize demo shell state")
+    }) {
+        Ok(state) => state,
+        Err(error) => {
+            log::error!("Failed to build shell state: {error}");
+            return HttpResponse::InternalServerError().body("Failed to build shell state");
+        }
+    };
 
     let mut writer = StringWriter {
         buf: String::with_capacity(8 * 1024),
@@ -185,6 +195,59 @@ pub(crate) async fn shell_asset(
         Err(e) => {
             log::error!("Failed to read shell asset {}: {e}", asset_path.display());
             HttpResponse::InternalServerError().finish()
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::registry::AppRunConfig;
+
+    #[test]
+    fn generated_state_preserves_integer_counter_rendering() {
+        let apps = vec![app("first"), app("second")];
+        let state = serde_json::to_value(build_state(&apps, 0).unwrap()).unwrap();
+        let app_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../src");
+        let protocol = build(BuildOptions {
+            app_dir,
+            entry: "index.html".to_string(),
+            plugin: Some(Plugin::WebUI),
+            ..BuildOptions::default()
+        })
+        .unwrap()
+        .protocol;
+        let mut writer = StringWriter {
+            buf: String::with_capacity(8 * 1024),
+        };
+        let handler = WebUIHandler::with_plugin(|| Box::new(WebUIHydrationPlugin::new()));
+
+        handler
+            .handle(
+                &protocol,
+                &state,
+                &RenderOptions::new("index.html", "/"),
+                &mut writer,
+            )
+            .unwrap();
+
+        assert!(writer.buf.contains("class=\"counter\">1 / 2"));
+        assert!(writer.buf.contains("aria-label=\"Previous app\" disabled"));
+    }
+
+    fn app(slug: &str) -> AppEntry {
+        AppEntry {
+            name: slug.to_string(),
+            slug: slug.to_string(),
+            description: format!("{slug} description"),
+            backend: "rust".to_string(),
+            port: 3000,
+            api_port: None,
+            dir: PathBuf::new(),
+            config: AppRunConfig::CustomBinary {
+                binary: "example".to_string(),
+                args: Vec::new(),
+            },
         }
     }
 }

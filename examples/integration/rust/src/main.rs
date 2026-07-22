@@ -14,12 +14,16 @@
 //!   # Render with WebUI Framework hydration markers
 //!   cargo run -- ../../app/contact-book-manager/dist/protocol.bin ../../app/contact-book-manager/data/state.json --plugin=webui
 
+mod generated_state;
+
 use anyhow::{Context, Result};
 use std::env;
 use std::fs;
 use webui_handler::plugin::webui::WebUIHydrationPlugin;
 use webui_handler::{RenderOptions, ResponseWriter, WebUIHandler};
 use webui_protocol::WebUIProtocol;
+
+use generated_state::RustExampleState;
 
 struct StdoutWriter;
 
@@ -39,7 +43,7 @@ fn main() -> Result<()> {
     let args: Vec<String> = env::args().collect();
     if args.len() < 3 {
         eprintln!(
-            "Usage: {} <protocol.bin> <state.json> [--plugin=webui]",
+            "Usage: {} <protocol.bin> <state.json> [--plugin=webui] [--typed]",
             args[0]
         );
         std::process::exit(1);
@@ -50,14 +54,20 @@ fn main() -> Result<()> {
 
     // Check for --plugin=<name> flag.
     let plugin_name = args.iter().find_map(|a| a.strip_prefix("--plugin="));
+    let typed = args.iter().any(|arg| arg == "--typed");
 
     let protocol = WebUIProtocol::from_protobuf_file(protocol_path)
         .with_context(|| format!("Failed to load protocol: {protocol_path}"))?;
 
     let state_json = fs::read_to_string(state_path)
         .with_context(|| format!("Failed to read state: {state_path}"))?;
-    let state: serde_json::Value =
-        serde_json::from_str(&state_json).context("Failed to parse state JSON")?;
+    let state = if typed {
+        let state: RustExampleState =
+            serde_json::from_str(&state_json).context("Failed to parse typed state JSON")?;
+        serde_json::to_value(state).context("Failed to serialize typed state")?
+    } else {
+        serde_json::from_str(&state_json).context("Failed to parse state JSON")?
+    };
 
     let handler = match plugin_name {
         Some("webui") => WebUIHandler::with_plugin(|| Box::new(WebUIHydrationPlugin::new())),

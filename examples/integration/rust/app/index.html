@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>{{title}}</title>
+</head>
+<body>
+  <h1>{{title}}</h1>
+  <if condition="showDetails">
+    <p>{{details}}</p>
+  </if>
+  <ul>
+    <for each="item in items">
+      <li>{{item.label}}</li>
+    </for>
+  </ul>
+</body>
+</html>

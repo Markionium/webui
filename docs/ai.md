@@ -694,6 +694,24 @@ Broad scalar and condition schemas may include a non-validating
 `x-webui.preferredType` hint. Integer literals infer `integer`, and known types
 propagate across path-to-path equality.
 
+### Generate host-language state types
+
+```bash
+webui generate typescript ./dist/protocol.state.schema.json \
+  --name AppState \
+  --out ./src/generated/app-state.ts
+webui generate rust ./dist/protocol.state.schema.json \
+  --name AppState \
+  --out ./src/generated/app_state.rs
+webui generate csharp ./dist/protocol.state.schema.json \
+  --name AppState \
+  --namespace WebUI.Generated
+```
+
+All generators consume `x-webui.preferredType` when present. Otherwise open
+values become `unknown`, `serde_json::Value`, and `JsonElement` in TypeScript,
+Rust, and C#, respectively. Routed schemas generate one type per route chain.
+
 ## Build Diagnostics & Error Output
 
 Authoring mistakes fail `webui build` with a structured, actionable diagnostic

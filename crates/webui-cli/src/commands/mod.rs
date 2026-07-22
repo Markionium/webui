@@ -3,6 +3,7 @@
 
 pub mod build;
 pub mod common;
+pub mod generate;
 pub mod inspect;
 pub mod serve;
 pub mod state_schema;
@@ -19,4 +20,6 @@ pub enum Commands {
     Serve(serve::ServeArgs),
     /// Generate a JSON Schema for a compiled protocol's render state
     Schema(state_schema::SchemaArgs),
+    /// Generate host-language types from a render-state JSON Schema
+    Generate(generate::GenerateArgs),
 }

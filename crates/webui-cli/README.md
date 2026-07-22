@@ -100,6 +100,25 @@ for each route chain plus an `x-webui-routes` path-to-schema mapping.
 Broad values may include `x-webui.preferredType` as a non-validating hint for
 future host-language type generation.
 
+### `webui generate`
+
+Generate host-language types from a render-state schema:
+
+```bash
+webui generate typescript ./dist/protocol.state.schema.json --name AppState
+webui generate rust ./dist/protocol.state.schema.json \
+  --name AppState \
+  --out ./src/generated/app_state.rs
+webui generate csharp ./dist/protocol.state.schema.json \
+  --name AppState \
+  --namespace WebUI.Generated \
+  --visibility internal
+```
+
+Generated source is written to stdout unless `--out <FILE>` is provided.
+TypeScript emits interfaces and routed path mappings, Rust emits serde types,
+and C# emits classes plus a `System.Text.Json` source-generation context.
+
 ## App Layout
 
 ```

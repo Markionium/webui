@@ -5,6 +5,7 @@
   "private": true,
   "scripts": {
     "build": "esbuild src/index.ts --bundle --outfile=dist/index.js --format=esm --minify --sourcemap && cp src/index.css dist/index.css && cp src/demo-shell/demo-shell.css dist/demo-shell.css",
+    "generate:types": "cargo run -p microsoft-webui-cli -- build ./src --plugin=webui --out ./dist/shell.bin --emit-schema && cargo run -p microsoft-webui-cli -- generate rust ./dist/shell.state.schema.json --name DemoShellRenderState --out ./server/src/generated_state.rs",
     "start:client": "esbuild src/index.ts --bundle --outfile=dist/index.js --format=esm --sourcemap --watch",
     "start:server": "cargo run -p microsoft-webui-cli -- serve ./src --state ./data/state.json --plugin=webui --servedir ./dist --port 3099 --watch"
   },

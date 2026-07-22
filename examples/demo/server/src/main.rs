@@ -4,6 +4,7 @@
 #![allow(clippy::disallowed_methods)]
 
 mod api;
+mod generated_state;
 mod health;
 mod process;
 mod proxy;

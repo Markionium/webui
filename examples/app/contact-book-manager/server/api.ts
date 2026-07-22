@@ -15,6 +15,7 @@ import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
+import type { ContactBookStateByPath } from './generated/contact-book-state.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -34,6 +35,15 @@ interface Contact {
   notes: string;
   address: string;
 }
+
+type HostInjectedState = 'basePath' | 'tokens';
+type ApiState<Path extends keyof ContactBookStateByPath> =
+  Omit<ContactBookStateByPath[Path], HostInjectedState>;
+type ContactCardState = ApiState<'/contacts'>['contacts'][number];
+type SidebarState = Pick<
+  ApiState<'/contacts'>,
+  'activeGroup' | 'groups' | 'searchQuery' | 'totalContacts' | 'totalFavorites'
+>;
 
 // ---------------------------------------------------------------------------
 // Data layer
@@ -57,6 +67,10 @@ let groups: string[] = stateData.groups ?? [];
 
 function findContact(id: string): Contact | undefined {
   return contacts.find(c => c.id === id);
+}
+
+function routeParam(value: string | string[]): string {
+  return Array.isArray(value) ? (value[0] ?? '') : value;
 }
 
 function uniqueGroups(): string[] {
@@ -134,87 +148,119 @@ ssr.use((req: Request, res: Response, next) => {
 });
 
 /** Lightweight state needed by the sidebar shell during SSR. */
-function sidebarState() {
+function sidebarState(activeGroup = 'all'): SidebarState {
   return {
-    totalContacts: contacts.length,
-    totalFavorites: favoriteContacts().length,
-    totalGroups: uniqueGroups().length,
+    activeGroup,
     groups: uniqueGroups(),
+    searchQuery: '',
+    totalContacts: String(contacts.length),
+    totalFavorites: String(favoriteContacts().length),
+  };
+}
+
+function contactCardState(contact: Contact): ContactCardState {
+  return {
+    ...contact,
+    favorite: String(contact.favorite),
   };
 }
 
 // Dashboard — needs stats for the stat cards + recent contacts
 ssr.get('/', (_req: Request, res: Response) => {
-  res.json({
-    state: {
-      page: 'dashboard',
-      ...sidebarState(),
-      recentContacts: recentContacts(5),
-    },
-  });
+  const state: ApiState<'/'> = {
+    page: 'dashboard',
+    ...sidebarState(),
+    totalGroups: String(uniqueGroups().length),
+    recentContacts: recentContacts(5).map(contactCardState),
+  };
+  res.json({ state });
 });
 
 // All contacts
 ssr.get('/contacts', (_req: Request, res: Response) => {
-  res.json({ state: { page: 'contacts', ...sidebarState(), contacts } });
+  const state: ApiState<'/contacts'> = {
+    page: 'contacts',
+    ...sidebarState(),
+    contacts: contacts.map(contactCardState),
+  };
+  res.json({ state });
 });
 
 // Add contact form — must be before /contacts/:id to avoid matching "add" as an id
 ssr.get('/contacts/add', (_req: Request, res: Response) => {
   const sidebar = sidebarState();
-  res.json({
-    state: {
-      page: 'contacts',
-      ...sidebar,
-      selectedGroup: sidebar.groups[0] ?? '',
-      formTitle: 'Add Contact',
-    },
-  });
+  const state: ApiState<'/contacts/add'> = {
+    page: 'contacts',
+    ...sidebar,
+    address: '',
+    company: '',
+    editId: '',
+    email: '',
+    firstName: '',
+    formTitle: 'Add Contact',
+    lastName: '',
+    notes: '',
+    phone: '',
+    selectedGroup: sidebar.groups[0] ?? '',
+  };
+  res.json({ state });
 });
 
 // Edit contact form — must be before /contacts/:id to avoid conflicts
 ssr.get('/contacts/:id/edit', (req: Request, res: Response) => {
-  const contact = findContact(req.params.id);
+  const contact = findContact(routeParam(req.params.id));
   if (!contact) { res.status(404).json({ error: 'Contact not found' }); return; }
-  const { id, ...contactState } = contact;
-  res.json({
-    state: {
-      page: 'contacts',
-      ...sidebarState(),
-      ...contactState,
-      editId: id,
-      selectedGroup: contact.group,
-      formTitle: 'Edit Contact',
-    },
-  });
+  const state: ApiState<'/contacts/:id/edit'> = {
+    page: 'contacts',
+    ...sidebarState(),
+    address: contact.address,
+    company: contact.company,
+    editId: contact.id,
+    email: contact.email,
+    firstName: contact.firstName,
+    formTitle: 'Edit Contact',
+    lastName: contact.lastName,
+    notes: contact.notes,
+    phone: contact.phone,
+    selectedGroup: contact.group,
+  };
+  res.json({ state });
 });
 
 // Contact detail — spread contact fields at top level for SSR template bindings
 ssr.get('/contacts/:id', (req: Request, res: Response) => {
-  const contact = findContact(req.params.id);
+  const contact = findContact(routeParam(req.params.id));
   if (!contact) { res.status(404).json({ error: 'Contact not found' }); return; }
-  res.json({ state: { page: 'contacts', ...sidebarState(), ...contact, selectedContact: contact } });
+  const state: ApiState<'/contacts/:id'> = {
+    page: 'contacts',
+    ...sidebarState(),
+    ...contact,
+  };
+  res.json({ state });
 });
 
 // Favorites
 ssr.get('/favorites', (_req: Request, res: Response) => {
-  res.json({ state: { page: 'favorites', ...sidebarState(), contacts: favoriteContacts() } });
+  const state: ApiState<'/favorites'> = {
+    page: 'favorites',
+    ...sidebarState(),
+    contacts: favoriteContacts().map(contactCardState),
+  };
+  res.json({ state });
 });
 
 // Group-filtered contacts
 ssr.get('/groups/:group', (req: Request, res: Response) => {
-  const groupSlug = req.params.group;
+  const groupSlug = routeParam(req.params.group);
   const filtered = contacts.filter(c => c.group.toLowerCase() === groupSlug.toLowerCase());
   const displayName = filtered[0]?.group ?? groupSlug;
-  res.json({
-    state: {
-      page: 'group',
-      activeGroup: displayName,
-      ...sidebarState(),
-      contacts: filtered,
-      groupName: displayName,
-    },
-  });
+  const state: ApiState<'/groups/:group'> = {
+    page: 'group',
+    ...sidebarState(displayName),
+    contacts: filtered.map(contactCardState),
+    groupName: displayName,
+  };
+  res.json({ state });
 });
 
 // ---------------------------------------------------------------------------
@@ -252,7 +298,7 @@ app.get('/api/contacts', (_req: Request, res: Response) => {
 
 // Get single contact
 app.get('/api/contacts/:id', (req: Request, res: Response) => {
-  const contact = findContact(req.params.id);
+  const contact = findContact(routeParam(req.params.id));
   if (!contact) { res.status(404).json({ error: 'Contact not found' }); return; }
   res.json(contact);
 });
@@ -281,7 +327,8 @@ app.post('/api/contacts', (req: Request, res: Response) => {
 
 // Update contact
 app.put('/api/contacts/:id', (req: Request, res: Response) => {
-  const idx = contacts.findIndex(c => c.id === req.params.id);
+  const id = routeParam(req.params.id);
+  const idx = contacts.findIndex(c => c.id === id);
   if (idx === -1) { res.status(404).json({ error: 'Contact not found' }); return; }
 
   const existing = contacts[idx];
@@ -312,7 +359,8 @@ app.put('/api/contacts/:id', (req: Request, res: Response) => {
 
 // Delete contact
 app.delete('/api/contacts/:id', (req: Request, res: Response) => {
-  const idx = contacts.findIndex(c => c.id === req.params.id);
+  const id = routeParam(req.params.id);
+  const idx = contacts.findIndex(c => c.id === id);
   if (idx === -1) { res.status(404).json({ error: 'Contact not found' }); return; }
   contacts.splice(idx, 1);
   res.status(204).end();
