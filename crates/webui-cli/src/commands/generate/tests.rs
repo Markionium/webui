@@ -93,6 +93,26 @@ fn routed_example_generated_types_are_current() {
 }
 
 #[test]
+fn contact_book_generated_types_are_current() {
+    let workspace = workspace_root();
+    let result = webui::build(BuildOptions {
+        app_dir: workspace.join("examples/app/contact-book-manager/src"),
+        plugin: Some(Plugin::WebUI),
+        ..BuildOptions::default()
+    })
+    .unwrap();
+    let schema =
+        state_schema::generate_schema(&result.protocol, "index.html", "ContactBookState").unwrap();
+    let document = TypeDocument::from_schema(&schema, None).unwrap();
+    let output = TypeScriptGenerator.generate(&document).unwrap();
+    let checked_in = std::fs::read_to_string(
+        workspace.join("examples/app/contact-book-manager/server/generated/contact-book-state.ts"),
+    )
+    .unwrap();
+    assert_eq!(checked_in, output);
+}
+
+#[test]
 fn rust_example_generated_types_are_current() {
     let workspace = workspace_root();
     let result = webui::build(BuildOptions {
@@ -106,6 +126,26 @@ fn rust_example_generated_types_are_current() {
     let output = RustGenerator.generate(&document).unwrap();
     let checked_in =
         std::fs::read_to_string(workspace.join("examples/integration/rust/src/generated_state.rs"))
+            .unwrap();
+    assert_eq!(checked_in, output);
+}
+
+#[test]
+fn demo_shell_generated_types_are_current() {
+    let workspace = workspace_root();
+    let result = webui::build(BuildOptions {
+        app_dir: workspace.join("examples/demo/src"),
+        plugin: Some(Plugin::WebUI),
+        ..BuildOptions::default()
+    })
+    .unwrap();
+    let schema =
+        state_schema::generate_schema(&result.protocol, "index.html", "DemoShellRenderState")
+            .unwrap();
+    let document = TypeDocument::from_schema(&schema, None).unwrap();
+    let output = RustGenerator.generate(&document).unwrap();
+    let checked_in =
+        std::fs::read_to_string(workspace.join("examples/demo/server/src/generated_state.rs"))
             .unwrap();
     assert_eq!(checked_in, output);
 }

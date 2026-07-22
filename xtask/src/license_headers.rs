@@ -24,7 +24,9 @@ const CHECKED_EXTENSIONS: &[&str] = &["rs", "ts", "js", "cs", "h", "proto"];
 /// Generated files that are checked in but not hand-authored belong here.
 const SKIP_FILES: &[&str] = &[
     "crates/webui-ffi/include/webui_ffi.h",
+    "examples/app/contact-book-manager/server/generated/contact-book-state.ts",
     "examples/app/routes/server/src/generated/routes-state.ts",
+    "examples/demo/server/src/generated_state.rs",
     "examples/integration/rust/src/generated_state.rs",
 ];
 

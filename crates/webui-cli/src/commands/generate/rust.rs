@@ -11,6 +11,9 @@ use super::LanguageGenerator;
 
 pub(super) struct RustGenerator;
 
+const RUSTFMT_ATTRIBUTE_WIDTH: usize = 80;
+const FIELD_INDENT_WIDTH: usize = 4;
+
 enum RenderTask<'a> {
     Type(&'a TypeRef),
     Text(&'static str),
@@ -83,20 +86,29 @@ fn render_struct(
     let mut names = BTreeSet::new();
     for property in &definition.properties {
         let field_name = allocate_field_name(&property.json_name, &mut names);
+        let json_name = serde_json::to_string(&property.json_name)?;
         if property.required {
             writer.push("#[serde(rename = ");
-            writer.push(&serde_json::to_string(&property.json_name)?);
+            writer.push(&json_name);
             writer.line(")]");
         } else {
-            writer.line("#[serde(");
-            writer.indent();
-            writer.push("rename = ");
-            writer.push(&serde_json::to_string(&property.json_name)?);
-            writer.line(",");
-            writer.line("default,");
-            writer.line("skip_serializing_if = \"Option::is_none\"");
-            writer.dedent();
-            writer.line(")]");
+            let single_line = format!(
+                "#[serde(rename = {json_name}, default, \
+                 skip_serializing_if = \"Option::is_none\")]"
+            );
+            if FIELD_INDENT_WIDTH + single_line.len() <= RUSTFMT_ATTRIBUTE_WIDTH {
+                writer.line(&single_line);
+            } else {
+                writer.line("#[serde(");
+                writer.indent();
+                writer.push("rename = ");
+                writer.push(&json_name);
+                writer.line(",");
+                writer.line("default,");
+                writer.line("skip_serializing_if = \"Option::is_none\"");
+                writer.dedent();
+                writer.line(")]");
+            }
         }
         writer.push("pub ");
         writer.push(&field_name);
