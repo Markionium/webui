@@ -10,6 +10,7 @@ pub(super) enum InferredKind {
     Scalar,
     String,
     Boolean,
+    Integer,
     Number,
     Object,
 }
@@ -83,6 +84,22 @@ pub(super) fn add_array_path(root: &mut Node, path: &str, required: bool) {
             .array_item
             .get_or_insert_with(|| Box::new(Node::default()));
     }
+}
+
+pub(super) fn resolved_kind(root: &Node, path: &str) -> Option<InferredKind> {
+    let mut current = root;
+    let mut parts = path.split('.').filter(|part| !part.is_empty()).peekable();
+    while let Some(part) = parts.next() {
+        if part == "length" && parts.peek().is_none() {
+            return current.length_kind;
+        }
+        let (name, array_depth) = split_array_suffix(part);
+        current = current.children.get(name)?;
+        for _ in 0..array_depth {
+            current = current.array_item.as_deref()?;
+        }
+    }
+    current.kind
 }
 
 pub(super) fn node_to_schema(root: &Node) -> Value {
@@ -168,24 +185,26 @@ fn descend_node<'a>(current: &'a mut Node, part: &str, required: bool) -> &'a mu
         return item;
     }
 
-    fn split_array_suffix(mut part: &str) -> (&str, usize) {
-        let mut depth = 0;
-        while let Some(base) = part.strip_suffix("[]") {
-            part = base;
-            depth += 1;
-        }
-        (part, depth)
-    }
-
     current.kind.get_or_insert(InferredKind::Object);
     let child = current.children.entry(part.to_string()).or_default();
     child.required |= required;
     child
 }
 
+fn split_array_suffix(mut part: &str) -> (&str, usize) {
+    let mut depth = 0;
+    while let Some(base) = part.strip_suffix("[]") {
+        part = base;
+        depth += 1;
+    }
+    (part, depth)
+}
+
 fn merge_kind(existing: Option<InferredKind>, incoming: InferredKind) -> InferredKind {
     match (existing, incoming) {
         (Some(InferredKind::Object), _) | (_, InferredKind::Object) => InferredKind::Object,
+        (Some(InferredKind::Number), InferredKind::Integer)
+        | (Some(InferredKind::Integer), InferredKind::Number) => InferredKind::Number,
         (Some(InferredKind::Any), specific) => specific,
         (Some(specific), InferredKind::Any) => specific,
         (Some(InferredKind::Scalar), specific) => specific,
@@ -213,6 +232,7 @@ fn leaf_schema(kind: InferredKind, preferred: Option<PreferredKind>) -> Value {
         InferredKind::Any => any_schema(),
         InferredKind::String => type_schema("string"),
         InferredKind::Boolean => type_schema("boolean"),
+        InferredKind::Integer => type_schema("integer"),
         InferredKind::Number => type_schema("number"),
         InferredKind::Object => object_schema(Map::new()),
     };
@@ -234,7 +254,9 @@ fn length_parent_schema(
 ) -> Value {
     match parent_kind {
         Some(InferredKind::Scalar | InferredKind::String) => return type_schema("string"),
-        Some(InferredKind::Number | InferredKind::Boolean) => return Value::Bool(false),
+        Some(InferredKind::Integer | InferredKind::Number | InferredKind::Boolean) => {
+            return Value::Bool(false);
+        }
         Some(InferredKind::Object) => return object_schema(Map::new()),
         Some(InferredKind::Any) | None => {}
     }

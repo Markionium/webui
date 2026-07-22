@@ -12,7 +12,8 @@ use webui_protocol::{
 };
 
 use super::model::{
-    add_array_path, add_resolved_path, node_to_schema, InferredKind, Node, PreferredKind,
+    add_array_path, add_resolved_path, node_to_schema, resolved_kind, InferredKind, Node,
+    PreferredKind,
 };
 use super::scope::{array_item_path, has_component_scope, resolve_path, BindingOrigin, Scope};
 
@@ -377,18 +378,19 @@ fn add_predicate_paths(root: &mut Node, scope: &Rc<Scope>, predicate: &webui_pro
                 Requirement::Optional,
             ),
             None => {
+                let evidence = predicate_path_evidence(root, scope, predicate);
                 add_path(
                     root,
                     scope,
                     &predicate.left,
-                    TypeEvidence::preferred(InferredKind::Scalar, PreferredKind::String),
+                    evidence,
                     Requirement::Optional,
                 );
                 add_path(
                     root,
                     scope,
                     &predicate.right,
-                    TypeEvidence::preferred(InferredKind::Scalar, PreferredKind::String),
+                    evidence,
                     Requirement::Optional,
                 );
             }
@@ -400,6 +402,9 @@ fn literal_kind(value: &str) -> Option<InferredKind> {
     if value == "true" || value == "false" {
         return Some(InferredKind::Boolean);
     }
+    if value.parse::<i64>().is_ok() || value.parse::<u64>().is_ok() {
+        return Some(InferredKind::Integer);
+    }
     if value.parse::<f64>().is_ok() {
         return Some(InferredKind::Number);
     }
@@ -409,6 +414,28 @@ fn literal_kind(value: &str) -> Option<InferredKind> {
         return Some(InferredKind::String);
     }
     None
+}
+
+fn predicate_path_evidence(
+    root: &Node,
+    scope: &Rc<Scope>,
+    predicate: &webui_protocol::Predicate,
+) -> TypeEvidence {
+    for path in [&predicate.left, &predicate.right] {
+        let BindingOrigin::RootPath { path, .. } = resolve_path(scope, path) else {
+            continue;
+        };
+        if let Some(
+            kind @ (InferredKind::String
+            | InferredKind::Boolean
+            | InferredKind::Integer
+            | InferredKind::Number),
+        ) = resolved_kind(root, &path)
+        {
+            return TypeEvidence::exact(kind);
+        }
+    }
+    TypeEvidence::preferred(InferredKind::Scalar, PreferredKind::String)
 }
 
 fn add_path(
